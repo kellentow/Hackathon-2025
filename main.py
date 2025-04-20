@@ -26,7 +26,7 @@ def list_division(list1,other, isnum=False):
         for i in range(len(list1)):
             new.append(float(list1[i]/other))
         return new
-    elif len(list1) == len(list2):
+    elif len(list1) == len(other):
         new = []
         for i in range(len(list1)):
             new.append(list1[i]/other[i])
@@ -34,7 +34,7 @@ def list_division(list1,other, isnum=False):
     else:
         raise ValueError("Tuples not the same length")
 
-def create_box(x,y,w,h,mass=10,friction=1,class_type=pymunk.Body.DYNAMIC):
+def create_box(x,y,w,h,mass=10,friction=0.01,class_type=pymunk.Body.DYNAMIC):
     body = pymunk.Body(body_type=class_type)
     body.position = x,y
     shape = pymunk.Poly.create_box(body, (w,h), 0)
@@ -44,7 +44,7 @@ def create_box(x,y,w,h,mass=10,friction=1,class_type=pymunk.Body.DYNAMIC):
     boxes.append(shape)
     return shape
 
-def create_ball(x,y,r,mass=10,friction=1,class_type=pymunk.Body.DYNAMIC):
+def create_ball(x,y,r,mass=10,friction=0.01,class_type=pymunk.Body.DYNAMIC):
     body = pymunk.Body(body_type=class_type)
     body.position = x,y
     shape = pymunk.Circle(body, r)
@@ -65,7 +65,7 @@ def open_level(n):
             x=0
             p_pos = line.strip("\n").split(",")
             print(p_pos)
-            player = create_ball(float(p_pos[0])*100,float(p_pos[1])*100,20,1099999,0.65)
+            player = create_ball(float(p_pos[0])*100,float(p_pos[1])*100,20,1099999,0.1)
             print(player.body.position)
             continue
         for char in line:
@@ -74,6 +74,8 @@ def open_level(n):
                     create_box(x*100,y*100,100,100,1,1,pymunk.Body.STATIC)
                 case "!":
                     create_box(x*100,y*100,100,100,1,1)
+                case "*":
+                    create_ball(x*100,y*100,50,1,0,pymunk.Body.STATIC)
             x+=1
             
         x=0
@@ -90,8 +92,6 @@ while running:
     mouse_x,mouse_y =pygame.mouse.get_pos()
     theta = np.arctan2(mouse_x-screen_size[0]/2,mouse_y-screen_size[1]/2)
     player.body.rotation = theta
-
-    player.body.velocity*= 0.99
 
     player_pos = player.body.position
     player_vel = player.body.velocity
@@ -111,11 +111,31 @@ while running:
     screen.fill((0,0,0))
     space.step(dt)
     for shape in boxes:
+        # Custom Physics
+        friction = shape.friction
+        shape.body.velocity *= (1-friction)
+        shape.body.angular_velocity *= (1-friction)
+
+        # Draw
         x,y = shape.body.position
         verts = shape.get_vertices()
-        p = [munk2pygame(vec.x+player_pos[0]-x,vec.y+player_pos[1]-y) for vec in verts]
+        p=[]
+        for vec in verts:
+            vx,vy = vec.rotated(shape.body.angle)
+            vx += player_pos[0]-x
+            vy += player_pos[1]-y
+            p.append(munk2pygame(vx,vy))
         pygame.draw.polygon(screen,(200,200,100),p)
     for shape in balls:
-        pygame.draw.circle(screen,(100,200,200),munk2pygame(*(shape.body.position-player_pos)),shape.radius)
+        # Custom Physics
+        friction = shape.friction
+        shape.body.velocity *= (1-friction)
+        shape.body.angular_velocity *= (1-friction)
+
+        # Draw'
+        x,y = shape.body.position
+        sx = player_pos[0]-x
+        sy = player_pos[1]-y
+        pygame.draw.circle(screen,(100,200,200),munk2pygame(sx,sy),shape.radius)
     pygame.display.flip()
     dt = clock.tick(60)
